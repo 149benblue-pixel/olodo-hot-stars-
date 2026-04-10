@@ -1,0 +1,155 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: players
+// Fields:
+//   - name: string (required, 1-100 chars)
+//   - number: number (required, 1-99)
+//   - position: string (required, ['Goalkeeper', 'Defender', 'Midfielder', 'Striker'])
+//   - photoUrl: string (optional, URL)
+//   - stats: map (required)
+//     - matchesPlayed: number (required, >= 0)
+//     - goals: number (required, >= 0)
+//     - assists: number (required, >= 0)
+//     - rating: number (required, 0-10)
+//
+// Collection: officials
+// Fields:
+//   - name: string (required, 1-100 chars)
+//   - role: string (required, 1-100 chars)
+//   - photoUrl: string (optional, URL)
+//   - contact: string (optional, 1-50 chars)
+//
+// Collection: matches
+// Fields:
+//   - opponent: string (required, 1-100 chars)
+//   - date: string (required, ISO 8601)
+//   - time: string (optional)
+//   - venue: string (optional)
+//   - competition: string (required)
+//   - status: string (required, ['played', 'upcoming'])
+//   - score: map (optional)
+//     - home: number
+//     - away: number
+//   - isHome: bool (required)
+//
+// Collection: news
+// Fields:
+//   - title: string (required, 1-200 chars)
+//   - content: string (required, 1-5000 chars)
+//   - date: string (required, ISO 8601)
+//   - imageUrl: string (optional, URL)
+//   - category: string (required, ['Match Result', 'Announcement', 'Tournament', 'Notice'])
+//
+// Collection: users
+// Fields:
+//   - email: string (required)
+//   - role: string (required, ['admin', 'client'])
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "149benblue@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}.*");
+    }
+
+    // ===============================================================
+    // Validation Functions
+    // ===============================================================
+
+    function isValidPlayer(data) {
+      return data.keys().hasAll(['name', 'number', 'position', 'stats']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.number is number && data.number >= 1 && data.number <= 99 &&
+             data.position in ['Goalkeeper', 'Defender', 'Midfielder', 'Striker'] &&
+             data.stats is map &&
+             data.stats.matchesPlayed is number && data.stats.matchesPlayed >= 0 &&
+             data.stats.goals is number && data.stats.goals >= 0 &&
+             data.stats.assists is number && data.stats.assists >= 0 &&
+             data.stats.rating is number && data.stats.rating >= 0 && data.stats.rating <= 10 &&
+             (!('photoUrl' in data) || isValidUrl(data.photoUrl));
+    }
+
+    function isValidOfficial(data) {
+      return data.keys().hasAll(['name', 'role']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.role is string && data.role.size() > 0 && data.role.size() <= 100 &&
+             (!('photoUrl' in data) || isValidUrl(data.photoUrl)) &&
+             (!('contact' in data) || (data.contact is string && data.contact.size() <= 50));
+    }
+
+    function isValidMatch(data) {
+      return data.keys().hasAll(['opponent', 'date', 'competition', 'status', 'isHome']) &&
+             data.opponent is string && data.opponent.size() > 0 && data.opponent.size() <= 100 &&
+             isValidDateString(data.date) &&
+             data.competition is string &&
+             data.status in ['played', 'upcoming'] &&
+             data.isHome is bool &&
+             (!('score' in data) || (data.score is map && data.score.home is number && data.score.away is number));
+    }
+
+    function isValidNews(data) {
+      return data.keys().hasAll(['title', 'content', 'date', 'category']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+             data.content is string && data.content.size() > 0 && data.content.size() <= 5000 &&
+             isValidDateString(data.date) &&
+             data.category in ['Match Result', 'Announcement', 'Tournament', 'Notice'] &&
+             (!('imageUrl' in data) || isValidUrl(data.imageUrl));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /players/{playerId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidPlayer(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /officials/{officialId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidOfficial(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /matches/{matchId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidMatch(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /news/{newsId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidNews(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create, update: if isAdmin();
+    }
+  }
+}
