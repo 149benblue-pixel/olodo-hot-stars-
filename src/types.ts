@@ -11,6 +11,8 @@ export interface Player {
     goals: number;
     assists: number;
     rating: number;
+    wins: number;
+    shots: number;
   };
   contact?: string;
 }
@@ -35,6 +37,7 @@ export interface Match {
     home: number;
     away: number;
   };
+  attendance?: number;
   isHome: boolean;
 }
 

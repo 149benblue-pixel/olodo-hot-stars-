@@ -7,10 +7,11 @@ import { Label } from "@/src/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { Badge } from "@/src/components/ui/badge";
 import { ScrollArea } from "@/src/components/ui/scroll-area";
-import { Plus, Edit2, Trash2, Save, X, LogIn, LayoutDashboard, Users, Trophy, Newspaper, Image as ImageIcon, Loader2, Briefcase, Phone } from "lucide-react";
+import { Plus, Edit2, Trash2, Save, X, LogIn, LayoutDashboard, Users, Trophy, Newspaper, Image as ImageIcon, Loader2, Briefcase, Phone, Upload, Clock, MapPin } from "lucide-react";
 import { useAuth } from "@/src/AuthContext";
-import { signInWithGoogle, logout, db } from "@/src/firebase";
+import { signInWithGoogle, logout, db, storage } from "@/src/firebase";
 import { collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { ref as sRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Player, Match, NewsItem, Official, GalleryItem, Position } from "@/src/types";
 import { handleFirestoreError, OperationType } from "@/src/lib/firestore-errors";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/src/components/ui/dialog";
@@ -19,6 +20,11 @@ export default function Admin() {
   const { user, loading: authLoading, isAuthReady } = useAuth();
   const [activeTab, setActiveTab] = useState("players");
   const [playerSearch, setPlayerSearch] = useState("");
+  const galleryFileInputRef = React.useRef<HTMLInputElement>(null);
+  const playerFileInputRef = React.useRef<HTMLInputElement>(null);
+  const officialFileInputRef = React.useRef<HTMLInputElement>(null);
+  const newsFileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -35,11 +41,14 @@ export default function Admin() {
     number: "",
     position: "Striker" as Position,
     photoUrl: "",
+    contact: "",
     stats: {
       matchesPlayed: 0,
       goals: 0,
       assists: 0,
-      rating: 0
+      rating: 0,
+      wins: 0,
+      shots: 0
     }
   });
 
@@ -159,7 +168,9 @@ export default function Admin() {
           matchesPlayed: Number(playerForm.stats.matchesPlayed),
           goals: Number(playerForm.stats.goals),
           assists: Number(playerForm.stats.assists),
-          rating: Number(playerForm.stats.rating)
+          rating: Number(playerForm.stats.rating),
+          wins: Number(playerForm.stats.wins || 0),
+          shots: Number(playerForm.stats.shots || 0)
         }
       };
 
@@ -175,7 +186,8 @@ export default function Admin() {
         number: "",
         position: "Striker",
         photoUrl: "",
-        stats: { matchesPlayed: 0, goals: 0, assists: 0, rating: 0 }
+        contact: "",
+        stats: { matchesPlayed: 0, goals: 0, assists: 0, rating: 0, wins: 0, shots: 0 }
       });
     } catch (error) {
       handleFirestoreError(error, editingPlayer ? OperationType.UPDATE : OperationType.CREATE, "players");
@@ -199,6 +211,7 @@ export default function Admin() {
         number: player.number.toString(),
         position: player.position,
         photoUrl: player.photoUrl || "",
+        contact: player.contact || "",
         stats: { ...player.stats }
       });
     } else {
@@ -208,7 +221,8 @@ export default function Admin() {
         number: "",
         position: "Striker",
         photoUrl: "",
-        stats: { matchesPlayed: 0, goals: 0, assists: 0, rating: 0 }
+        contact: "",
+        stats: { matchesPlayed: 0, goals: 0, assists: 0, rating: 0, wins: 0, shots: 0 }
       });
     }
     setIsPlayerDialogOpen(true);
@@ -225,14 +239,22 @@ export default function Admin() {
     competition: "Regional League",
     status: "upcoming" as "played" | "upcoming",
     isHome: true,
-    score: { home: 0, away: 0 }
+    score: { home: 0, away: 0 },
+    attendance: "" as string | number
   });
 
   const handleSaveMatch = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const data = {
-        ...matchForm,
+        opponent: matchForm.opponent,
+        date: matchForm.date,
+        time: matchForm.time,
+        venue: matchForm.venue,
+        competition: matchForm.competition,
+        status: matchForm.status,
+        isHome: matchForm.isHome,
+        attendance: matchForm.attendance ? Number(matchForm.attendance) : null,
         score: matchForm.status === 'played' ? {
           home: Number(matchForm.score.home),
           away: Number(matchForm.score.away)
@@ -246,6 +268,17 @@ export default function Admin() {
       }
       setIsMatchDialogOpen(false);
       setEditingMatch(null);
+      setMatchForm({
+        opponent: "",
+        date: new Date().toISOString().split('T')[0],
+        time: "",
+        venue: "",
+        competition: "Regional League",
+        status: "upcoming",
+        isHome: true,
+        attendance: "",
+        score: { home: 0, away: 0 }
+      });
     } catch (error) {
       handleFirestoreError(error, editingMatch ? OperationType.UPDATE : OperationType.CREATE, "matches");
     }
@@ -262,6 +295,7 @@ export default function Admin() {
         competition: match.competition,
         status: match.status,
         isHome: match.isHome,
+        attendance: match.attendance || "",
         score: match.score || { home: 0, away: 0 }
       });
     } else {
@@ -274,6 +308,7 @@ export default function Admin() {
         competition: "Regional League",
         status: "upcoming",
         isHome: true,
+        attendance: "",
         score: { home: 0, away: 0 }
       });
     }
@@ -375,6 +410,29 @@ export default function Admin() {
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'gallery' | 'player' | 'official' | 'news') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const storageRef = sRef(storage, `${type}/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      
+      if (type === 'gallery') setGalleryForm(prev => ({ ...prev, imageUrl: url }));
+      if (type === 'player') setPlayerForm(prev => ({ ...prev, photoUrl: url }));
+      if (type === 'official') setOfficialForm(prev => ({ ...prev, photoUrl: url }));
+      if (type === 'news') setNewsForm(prev => ({ ...prev, imageUrl: url }));
+    } catch (error) {
+      console.error("Upload failed:", error);
+    } finally {
+      setIsUploading(false);
+      // Reset the input so the same file can be uploaded again if needed
+      e.target.value = '';
+    }
+  };
+
   const filteredPlayers = players.filter(player => 
     player.name.toLowerCase().includes(playerSearch.toLowerCase()) || 
     player.number.toString().includes(playerSearch)
@@ -450,10 +508,8 @@ export default function Admin() {
                 className="max-w-[200px] bg-card border-white/10"
               />
               <Dialog open={isPlayerDialogOpen} onOpenChange={setIsPlayerDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-primary text-primary-foreground" onClick={() => openPlayerDialog()}>
-                    <Plus className="mr-2 h-4 w-4" /> Add Player
-                  </Button>
+                <DialogTrigger render={<Button className="bg-primary text-primary-foreground" onClick={() => openPlayerDialog()} />}>
+                  <Plus className="mr-2 h-4 w-4" /> Add Player
                 </DialogTrigger>
                 <DialogContent className="bg-card border-white/10 text-foreground max-w-2xl">
                   <DialogHeader>
@@ -481,7 +537,45 @@ export default function Admin() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="p-photo">Photo URL</Label>
-                      <Input id="p-photo" value={playerForm.photoUrl} onChange={(e) => setPlayerForm({...playerForm, photoUrl: e.target.value})} className="bg-background border-white/10" />
+                      <div className="flex gap-2">
+                        <Input id="p-photo" value={playerForm.photoUrl} onChange={(e) => setPlayerForm({...playerForm, photoUrl: e.target.value})} className="bg-background border-white/10" placeholder="https://..." />
+                        <input 
+                          type="file" 
+                          ref={playerFileInputRef} 
+                          className="hidden" 
+                          accept="image/*" 
+                          onChange={(e) => handleFileUpload(e, 'player')}
+                        />
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          className="border-white/10 shrink-0"
+                          onClick={() => playerFileInputRef.current?.click()}
+                          disabled={isUploading}
+                        >
+                          {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                        </Button>
+                        {playerForm.photoUrl && (
+                          <Button 
+                            type="button" 
+                            variant="destructive" 
+                            className="shrink-0"
+                            onClick={() => setPlayerForm({...playerForm, photoUrl: ""})}
+                            title="Clear Photo"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      {playerForm.photoUrl && (
+                        <div className="mt-2 relative w-20 h-20 rounded-lg overflow-hidden border border-white/10 bg-muted">
+                          <img src={playerForm.photoUrl} alt="Preview" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="p-contact">Contact Information</Label>
+                      <Input id="p-contact" value={playerForm.contact} onChange={(e) => setPlayerForm({...playerForm, contact: e.target.value})} className="bg-background border-white/10" placeholder="Phone or Email..." />
                     </div>
                     <div className="col-span-full border-t border-white/5 pt-4 mt-2">
                       <h4 className="text-sm font-bold uppercase text-primary mb-4">Player Statistics</h4>
@@ -502,6 +596,14 @@ export default function Admin() {
                           <Label htmlFor="s-rating">Rating (0-10)</Label>
                           <Input id="s-rating" type="number" step="0.1" value={playerForm.stats.rating} onChange={(e) => setPlayerForm({...playerForm, stats: {...playerForm.stats, rating: Number(e.target.value)}})} className="bg-background border-white/10" />
                         </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="s-wins">Wins</Label>
+                          <Input id="s-wins" type="number" value={playerForm.stats.wins} onChange={(e) => setPlayerForm({...playerForm, stats: {...playerForm.stats, wins: Number(e.target.value)}})} className="bg-background border-white/10" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="s-shots">Shots</Label>
+                          <Input id="s-shots" type="number" value={playerForm.stats.shots} onChange={(e) => setPlayerForm({...playerForm, stats: {...playerForm.stats, shots: Number(e.target.value)}})} className="bg-background border-white/10" />
+                        </div>
                       </div>
                     </div>
                     <DialogFooter className="col-span-full pt-6">
@@ -517,27 +619,49 @@ export default function Admin() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredPlayers.map((player) => (
-              <Card key={player.id} className="border-white/5 bg-card/50">
-                <CardContent className="p-4 flex items-center gap-4">
-                  <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted">
-                    <img src={player.photoUrl || `https://picsum.photos/seed/${player.id}/100/100`} alt={player.name} className="w-full h-full object-cover" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-bold">{player.name}</h3>
-                    <p className="text-xs text-muted-foreground uppercase">{player.position} • #{player.number}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => openPlayerDialog(player)}>
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDeletePlayer(player.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            {filteredPlayers.map((player) => {
+              const winRate = player.stats.matchesPlayed > 0 ? (player.stats.wins / player.stats.matchesPlayed * 100).toFixed(1) : "0";
+              const conversionRate = player.stats.shots > 0 ? (player.stats.goals / player.stats.shots * 100).toFixed(1) : "0";
+              const assistRatio = player.stats.goals > 0 ? (player.stats.assists / player.stats.goals).toFixed(2) : "0";
+
+              return (
+                <Card key={player.id} className="border-white/5 bg-card/50 overflow-hidden">
+                  <CardContent className="p-0">
+                    <div className="p-4 flex items-center gap-4">
+                      <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted">
+                        <img src={player.photoUrl || `https://picsum.photos/seed/${player.id}/100/100`} alt={player.name} className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-bold">{player.name}</h3>
+                        <p className="text-xs text-muted-foreground uppercase">{player.position} • #{player.number}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => openPlayerDialog(player)}>
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDeletePlayer(player.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="bg-black/20 p-4 grid grid-cols-3 gap-2 border-t border-white/5">
+                      <div className="text-center">
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">Win Rate</p>
+                        <p className="text-sm font-bold text-primary">{winRate}%</p>
+                      </div>
+                      <div className="text-center border-x border-white/5">
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">Conv. Rate</p>
+                        <p className="text-sm font-bold text-primary">{conversionRate}%</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold">A/G Ratio</p>
+                        <p className="text-sm font-bold text-primary">{assistRatio}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
             {filteredPlayers.length === 0 && !loading && (
               <p className="text-muted-foreground col-span-full text-center py-12">No players found matching your search.</p>
             )}
@@ -548,10 +672,8 @@ export default function Admin() {
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold italic">Manage Officials</h2>
             <Dialog open={isOfficialDialogOpen} onOpenChange={setIsOfficialDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary text-primary-foreground" onClick={() => openOfficialDialog()}>
-                  <Plus className="mr-2 h-4 w-4" /> Add Official
-                </Button>
+              <DialogTrigger render={<Button className="bg-primary text-primary-foreground" onClick={() => openOfficialDialog()} />}>
+                <Plus className="mr-2 h-4 w-4" /> Add Official
               </DialogTrigger>
               <DialogContent className="bg-card border-white/10 text-foreground">
                 <DialogHeader>
@@ -584,13 +706,47 @@ export default function Admin() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="photoUrl">Photo URL</Label>
-                    <Input 
-                      id="photoUrl" 
-                      value={officialForm.photoUrl}
-                      onChange={(e) => setOfficialForm({ ...officialForm, photoUrl: e.target.value })}
-                      placeholder="https://..." 
-                      className="bg-background border-white/10" 
-                    />
+                    <div className="flex gap-2">
+                      <Input 
+                        id="photoUrl" 
+                        value={officialForm.photoUrl}
+                        onChange={(e) => setOfficialForm({ ...officialForm, photoUrl: e.target.value })}
+                        placeholder="https://..." 
+                        className="bg-background border-white/10" 
+                      />
+                      <input 
+                        type="file" 
+                        ref={officialFileInputRef} 
+                        className="hidden" 
+                        accept="image/*" 
+                        onChange={(e) => handleFileUpload(e, 'official')}
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="border-white/10 shrink-0"
+                        onClick={() => officialFileInputRef.current?.click()}
+                        disabled={isUploading}
+                      >
+                        {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                      </Button>
+                      {officialForm.photoUrl && (
+                        <Button 
+                          type="button" 
+                          variant="destructive" 
+                          className="shrink-0"
+                          onClick={() => setOfficialForm({...officialForm, photoUrl: ""})}
+                          title="Clear Photo"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {officialForm.photoUrl && (
+                      <div className="mt-2 relative w-20 h-20 rounded-lg overflow-hidden border border-white/10 bg-muted">
+                        <img src={officialForm.photoUrl} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="contact">Contact Information</Label>
@@ -650,10 +806,8 @@ export default function Admin() {
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold italic">Match Fixtures</h2>
             <Dialog open={isMatchDialogOpen} onOpenChange={setIsMatchDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary text-primary-foreground" onClick={() => openMatchDialog()}>
-                  <Plus className="mr-2 h-4 w-4" /> Add Match
-                </Button>
+              <DialogTrigger render={<Button className="bg-primary text-primary-foreground" onClick={() => openMatchDialog()} />}>
+                <Plus className="mr-2 h-4 w-4" /> Add Match
               </DialogTrigger>
               <DialogContent className="bg-card border-white/10 text-foreground max-w-2xl">
                 <DialogHeader>
@@ -671,6 +825,14 @@ export default function Admin() {
                     <Input id="m-date" type="date" value={matchForm.date} onChange={(e) => setMatchForm({...matchForm, date: e.target.value})} className="bg-background border-white/10" required />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="m-time">Time</Label>
+                    <Input id="m-time" type="time" value={matchForm.time} onChange={(e) => setMatchForm({...matchForm, time: e.target.value})} className="bg-background border-white/10" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="m-venue">Venue</Label>
+                    <Input id="m-venue" value={matchForm.venue} onChange={(e) => setMatchForm({...matchForm, venue: e.target.value})} className="bg-background border-white/10" placeholder="Stadium name..." />
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="m-comp">Competition</Label>
                     <Input id="m-comp" value={matchForm.competition} onChange={(e) => setMatchForm({...matchForm, competition: e.target.value})} className="bg-background border-white/10" required />
                   </div>
@@ -680,6 +842,10 @@ export default function Admin() {
                       <option value="upcoming">Upcoming</option>
                       <option value="played">Played</option>
                     </select>
+                    <div className="space-y-2">
+                      <Label htmlFor="m-attendance">Attendance</Label>
+                      <Input id="m-attendance" type="number" value={matchForm.attendance} onChange={(e) => setMatchForm({...matchForm, attendance: e.target.value})} className="bg-background border-white/10" placeholder="Number of fans..." />
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 py-2">
                     <input type="checkbox" id="m-home" checked={matchForm.isHome} onChange={(e) => setMatchForm({...matchForm, isHome: e.target.checked})} className="h-4 w-4 rounded border-white/10 bg-background" />
@@ -711,19 +877,36 @@ export default function Admin() {
             <CardContent className="p-0">
               <div className="divide-y divide-white/5">
                 {matches.map((match) => (
-                  <div key={match.id} className="p-6 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-primary uppercase mb-1">{match.competition} • {match.date}</p>
-                      <h3 className="font-bold">
-                        {match.isHome ? "Olodo Hot Stars" : match.opponent} vs. {match.isHome ? match.opponent : "Olodo Hot Stars"}
+                  <div key={match.id} className="p-6 flex items-center justify-between hover:bg-white/5 transition-colors">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge variant={match.status === 'upcoming' ? 'default' : 'secondary'} className="text-[10px] uppercase">
+                          {match.status}
+                        </Badge>
+                        <p className="text-xs font-bold text-primary uppercase">{match.competition} • {match.date}</p>
+                      </div>
+                      <h3 className="font-bold text-lg">
+                        {match.isHome ? "Olodo Hot Stars" : match.opponent} 
+                        <span className="mx-2 text-primary">vs.</span> 
+                        {match.isHome ? match.opponent : "Olodo Hot Stars"}
                       </h3>
+                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                        {match.time && <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {match.time}</span>}
+                        {match.venue && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {match.venue}</span>}
+                      </div>
                       {match.status === 'played' && match.score && (
-                        <p className="text-2xl font-black italic mt-1">{match.score.home} - {match.score.away}</p>
+                        <div className="mt-3 inline-block bg-primary/10 px-4 py-1 rounded-full">
+                          <p className="text-xl font-black italic text-primary">{match.score.home} - {match.score.away}</p>
+                        </div>
                       )}
                     </div>
-                    <div className="flex gap-2">
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => openMatchDialog(match)}><Edit2 className="h-4 w-4" /></Button>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDeleteMatch(match.id)}><Trash2 className="h-4 w-4" /></Button>
+                    <div className="flex gap-2 ml-4">
+                      <Button size="icon" variant="ghost" className="h-10 w-10 text-primary hover:bg-primary/10" onClick={() => openMatchDialog(match)}>
+                        <Edit2 className="h-5 w-5" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteMatch(match.id)}>
+                        <Trash2 className="h-5 w-5" />
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -739,10 +922,8 @@ export default function Admin() {
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold italic">News Articles</h2>
             <Dialog open={isNewsDialogOpen} onOpenChange={setIsNewsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary text-primary-foreground" onClick={() => openNewsDialog()}>
-                  <Plus className="mr-2 h-4 w-4" /> Create Post
-                </Button>
+              <DialogTrigger render={<Button className="bg-primary text-primary-foreground" onClick={() => openNewsDialog()} />}>
+                <Plus className="mr-2 h-4 w-4" /> Create Post
               </DialogTrigger>
               <DialogContent className="bg-card border-white/10 text-foreground max-w-2xl">
                 <DialogHeader>
@@ -772,7 +953,41 @@ export default function Admin() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="n-img">Image URL</Label>
-                    <Input id="n-img" value={newsForm.imageUrl} onChange={(e) => setNewsForm({...newsForm, imageUrl: e.target.value})} className="bg-background border-white/10" />
+                    <div className="flex gap-2">
+                      <Input id="n-img" value={newsForm.imageUrl} onChange={(e) => setNewsForm({...newsForm, imageUrl: e.target.value})} className="bg-background border-white/10" placeholder="https://..." />
+                      <input 
+                        type="file" 
+                        ref={newsFileInputRef} 
+                        className="hidden" 
+                        accept="image/*" 
+                        onChange={(e) => handleFileUpload(e, 'news')}
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="border-white/10 shrink-0"
+                        onClick={() => newsFileInputRef.current?.click()}
+                        disabled={isUploading}
+                      >
+                        {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                      </Button>
+                      {newsForm.imageUrl && (
+                        <Button 
+                          type="button" 
+                          variant="destructive" 
+                          className="shrink-0"
+                          onClick={() => setNewsForm({...newsForm, imageUrl: ""})}
+                          title="Clear Image"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {newsForm.imageUrl && (
+                      <div className="mt-2 relative w-full aspect-video rounded-lg overflow-hidden border border-white/10 bg-muted">
+                        <img src={newsForm.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="n-content">Content</Label>
@@ -817,10 +1032,8 @@ export default function Admin() {
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold italic">Gallery Photos</h2>
             <Dialog open={isGalleryDialogOpen} onOpenChange={setIsGalleryDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-primary text-primary-foreground">
-                  <Plus className="mr-2 h-4 w-4" /> Upload Photo
-                </Button>
+              <DialogTrigger render={<Button className="bg-primary text-primary-foreground" />}>
+                <Plus className="mr-2 h-4 w-4" /> Upload Photo
               </DialogTrigger>
               <DialogContent className="bg-card border-white/10 text-foreground">
                 <DialogHeader>
@@ -829,7 +1042,48 @@ export default function Admin() {
                 <form onSubmit={handleSaveGallery} className="space-y-4 py-4">
                   <div className="space-y-2">
                     <Label htmlFor="g-url">Image URL</Label>
-                    <Input id="g-url" value={galleryForm.imageUrl} onChange={(e) => setGalleryForm({...galleryForm, imageUrl: e.target.value})} className="bg-background border-white/10" required />
+                    <div className="flex gap-2">
+                      <Input 
+                        id="g-url" 
+                        value={galleryForm.imageUrl} 
+                        onChange={(e) => setGalleryForm({...galleryForm, imageUrl: e.target.value})} 
+                        className="bg-background border-white/10" 
+                        placeholder="https://..."
+                        required 
+                      />
+                      <input 
+                        type="file" 
+                        ref={galleryFileInputRef} 
+                        className="hidden" 
+                        accept="image/*" 
+                        onChange={(e) => handleFileUpload(e, 'gallery')}
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="border-white/10 shrink-0"
+                        onClick={() => galleryFileInputRef.current?.click()}
+                        disabled={isUploading}
+                      >
+                        {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                      </Button>
+                      {galleryForm.imageUrl && (
+                        <Button 
+                          type="button" 
+                          variant="destructive" 
+                          className="shrink-0"
+                          onClick={() => setGalleryForm({...galleryForm, imageUrl: ""})}
+                          title="Clear Image"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {galleryForm.imageUrl && (
+                      <div className="mt-2 relative w-full aspect-square rounded-lg overflow-hidden border border-white/10 bg-muted">
+                        <img src={galleryForm.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="g-cat">Category</Label>

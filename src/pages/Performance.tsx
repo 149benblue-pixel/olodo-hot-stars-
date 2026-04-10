@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { Card, CardContent } from "@/src/components/ui/card";
 import { Badge } from "@/src/components/ui/badge";
-import { Trophy, Calendar, MapPin, TrendingUp, Target, Loader2 } from "lucide-react";
+import { Trophy, Calendar, MapPin, TrendingUp, Target, Loader2, Users } from "lucide-react";
 import { Match, TeamStats } from "@/src/types";
 import { db } from "@/src/firebase";
 import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
@@ -19,6 +19,7 @@ export default function Performance() {
     goalsConceded: 0,
     averageRating: 0
   });
+  const [avgAttendance, setAvgAttendance] = useState(0);
 
   useEffect(() => {
     const q = query(collection(db, "matches"), orderBy("date", "desc"));
@@ -28,7 +29,7 @@ export default function Performance() {
       
       // Calculate stats
       const playedMatches = fetchedMatches.filter(m => m.status === 'played');
-      let wins = 0, draws = 0, losses = 0, goalsScored = 0, goalsConceded = 0;
+      let wins = 0, draws = 0, losses = 0, goalsScored = 0, goalsConceded = 0, totalAttendance = 0, attendanceCount = 0;
       
       playedMatches.forEach(m => {
         if (m.score) {
@@ -49,6 +50,10 @@ export default function Performance() {
             else draws++;
           }
         }
+        if (m.attendance) {
+          totalAttendance += m.attendance;
+          attendanceCount++;
+        }
       });
 
       setStats({
@@ -58,8 +63,9 @@ export default function Performance() {
         losses,
         goalsScored,
         goalsConceded,
-        averageRating: 8.2 // Placeholder for now or calculate from player ratings
+        averageRating: 8.2
       });
+      setAvgAttendance(attendanceCount > 0 ? Math.round(totalAttendance / attendanceCount) : 0);
       setLoading(false);
     });
 
@@ -89,7 +95,7 @@ export default function Performance() {
           { label: "Matches Played", value: stats.totalMatches, icon: Calendar },
           { label: "Wins", value: stats.wins, icon: Trophy, color: "text-primary" },
           { label: "Goals Scored", value: stats.goalsScored, icon: Target },
-          { label: "Team Rating", value: stats.averageRating, icon: TrendingUp },
+          { label: "Avg Attendance", value: avgAttendance, icon: Users },
         ].map((stat, i) => (
           <Card key={i} className="bg-card border-white/10 text-center p-6">
             <div className="flex justify-center mb-2">
