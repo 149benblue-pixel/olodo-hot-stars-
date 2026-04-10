@@ -1,37 +1,33 @@
+import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { Badge } from "@/src/components/ui/badge";
 import { Card, CardContent } from "@/src/components/ui/card";
-import { Calendar, ArrowRight } from "lucide-react";
+import { Calendar, ArrowRight, Loader2 } from "lucide-react";
 import { NewsItem } from "@/src/types";
-
-const news: NewsItem[] = [
-  {
-    id: "1",
-    title: "Olodo Hot Stars Secure Crucial Away Win",
-    content: "In a thrilling match against Lake Victoria FC, the Stars showed incredible resilience to come back from a goal down and win 2-1. Goals from John Doe and Alex Smith secured the three points.",
-    date: "2026-04-05",
-    imageUrl: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=800",
-    category: "Match Result"
-  },
-  {
-    id: "2",
-    title: "New Training Facility Inaugurated",
-    content: "We are excited to announce the opening of our state-of-the-art training center in Olodo. This facility will serve both our senior and youth teams, providing them with the best environment to develop their skills.",
-    date: "2026-04-01",
-    imageUrl: "https://images.unsplash.com/photo-1517466787929-bc90951d0974?q=80&w=800",
-    category: "Announcement"
-  },
-  {
-    id: "3",
-    title: "Upcoming Youth Tournament Trials",
-    content: "Calling all young talents! Olodo Hot Stars will be holding trials for our U-17 team next weekend. If you think you have what it takes to be a star, come join us at the community grounds.",
-    date: "2026-03-25",
-    imageUrl: "https://images.unsplash.com/photo-1526232761682-d26e03ac148e?q=80&w=800",
-    category: "Tournament"
-  }
-];
+import { db } from "@/src/firebase";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 
 export default function News() {
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, "news"), orderBy("date", "desc"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setNews(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NewsItem)));
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="container py-12 px-4 max-w-5xl mx-auto">
       <div className="text-center mb-16">
@@ -54,7 +50,7 @@ export default function News() {
               <div className="flex flex-col md:flex-row">
                 <div className="md:w-2/5 aspect-video md:aspect-auto overflow-hidden">
                   <img 
-                    src={item.imageUrl} 
+                    src={item.imageUrl || `https://picsum.photos/seed/${item.id}/800/450`} 
                     alt={item.title} 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     referrerPolicy="no-referrer"
@@ -79,6 +75,9 @@ export default function News() {
             </Card>
           </motion.div>
         ))}
+        {news.length === 0 && (
+          <p className="text-center py-20 text-muted-foreground">No news articles published yet.</p>
+        )}
       </div>
     </div>
   );

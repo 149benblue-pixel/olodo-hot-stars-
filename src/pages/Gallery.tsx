@@ -1,23 +1,37 @@
-import { motion } from "motion/react";
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { Badge } from "@/src/components/ui/badge";
-import { useState } from "react";
 import { cn } from "@/src/lib/utils";
+import { db } from "@/src/firebase";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { GalleryItem } from "@/src/types";
+import { Loader2 } from "lucide-react";
 
 const categories = ["All", "Match", "Training", "Celebrations"];
 
-const photos = [
-  { id: 1, url: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=800", category: "Match", title: "Opening Match" },
-  { id: 2, url: "https://images.unsplash.com/photo-1517466787929-bc90951d0974?q=80&w=800", category: "Training", title: "Morning Drill" },
-  { id: 3, url: "https://images.unsplash.com/photo-1526232761682-d26e03ac148e?q=80&w=800", category: "Celebrations", title: "Victory Dance" },
-  { id: 4, url: "https://images.unsplash.com/photo-1551958219-acbc608c6377?q=80&w=800", category: "Match", title: "Goal Celebration" },
-  { id: 5, url: "https://images.unsplash.com/photo-1518091043644-c1d445bb5120?q=80&w=800", category: "Training", title: "Tactical Session" },
-  { id: 6, url: "https://images.unsplash.com/photo-1543351611-58f69d7c1781?q=80&w=800", category: "Celebrations", title: "Team Spirit" },
-];
-
 export default function Gallery() {
   const [filter, setFilter] = useState("All");
+  const [photos, setPhotos] = useState<GalleryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, "gallery"), orderBy("date", "desc"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setPhotos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GalleryItem)));
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
 
   const filteredPhotos = filter === "All" ? photos : photos.filter(p => p.category === filter);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="container py-12 px-4">
@@ -46,27 +60,32 @@ export default function Gallery() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredPhotos.map((photo) => (
-          <motion.div
-            layout
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            key={photo.id}
-            className="group relative aspect-square rounded-3xl overflow-hidden border border-white/5"
-          >
-            <img 
-              src={photo.url} 
-              alt={photo.title} 
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
-              <Badge className="w-fit mb-2 bg-primary text-primary-foreground">{photo.category}</Badge>
-              <h3 className="text-xl font-bold">{photo.title}</h3>
-            </div>
-          </motion.div>
-        ))}
+        <AnimatePresence mode="popLayout">
+          {filteredPhotos.map((photo) => (
+            <motion.div
+              layout
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              key={photo.id}
+              className="group relative aspect-square rounded-3xl overflow-hidden border border-white/5"
+            >
+              <img 
+                src={photo.imageUrl} 
+                alt="Gallery" 
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
+                <Badge className="w-fit mb-2 bg-primary text-primary-foreground">{photo.category}</Badge>
+                <p className="text-xs text-muted-foreground">{photo.date}</p>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+        {filteredPhotos.length === 0 && (
+          <p className="text-center col-span-full py-20 text-muted-foreground">No photos found in this category.</p>
+        )}
       </div>
     </div>
   );

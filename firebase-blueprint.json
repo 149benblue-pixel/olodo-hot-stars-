@@ -67,12 +67,24 @@
         "category": { "type": "string", "enum": ["Match Result", "Announcement", "Tournament", "Notice"] }
       },
       "required": ["title", "content", "date", "category"]
+    },
+    "GalleryItem": {
+      "title": "Gallery Item",
+      "description": "A photo in the club gallery",
+      "type": "object",
+      "properties": {
+        "imageUrl": { "type": "string" },
+        "category": { "type": "string", "enum": ["Match", "Training", "Celebrations"] },
+        "date": { "type": "string", "format": "date" }
+      },
+      "required": ["imageUrl", "category", "date"]
     }
   },
   "firestore": {
     "/players/{playerId}": { "schema": "Player", "description": "Collection of players" },
     "/officials/{officialId}": { "schema": "Official", "description": "Collection of officials" },
     "/matches/{matchId}": { "schema": "Match", "description": "Collection of matches" },
-    "/news/{newsId}": { "schema": "NewsItem", "description": "Collection of news items" }
+    "/news/{newsId}": { "schema": "NewsItem", "description": "Collection of news items" },
+    "/gallery/{photoId}": { "schema": "GalleryItem", "description": "Collection of gallery photos" }
   }
 }

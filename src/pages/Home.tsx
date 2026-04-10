@@ -1,9 +1,48 @@
+import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { Button } from "@/src/components/ui/button";
-import { Trophy, Calendar, ArrowRight, ShieldCheck } from "lucide-react";
+import { Trophy, Calendar, ArrowRight, ShieldCheck, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { db } from "@/src/firebase";
+import { collection, query, orderBy, limit, onSnapshot, where } from "firebase/firestore";
+import { Match, NewsItem } from "@/src/types";
 
 export default function Home() {
+  const [nextMatch, setNextMatch] = useState<Match | null>(null);
+  const [latestNews, setLatestNews] = useState<NewsItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Fetch next upcoming match
+    const qMatches = query(
+      collection(db, "matches"),
+      where("status", "==", "upcoming"),
+      orderBy("date", "asc"),
+      limit(1)
+    );
+    const unsubMatches = onSnapshot(qMatches, (snapshot) => {
+      if (!snapshot.empty) {
+        setNextMatch({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Match);
+      }
+      setLoading(false);
+    });
+
+    // Fetch 3 latest news items
+    const qNews = query(
+      collection(db, "news"),
+      orderBy("date", "desc"),
+      limit(3)
+    );
+    const unsubNews = onSnapshot(qNews, (snapshot) => {
+      setLatestNews(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as NewsItem)));
+    });
+
+    return () => {
+      unsubMatches();
+      unsubNews();
+    };
+  }, []);
+
   return (
     <div className="flex flex-col gap-20 pb-20">
       {/* Hero Section */}
@@ -51,37 +90,43 @@ export default function Home() {
       </section>
 
       {/* Next Match Highlight */}
-      <section className="container px-4">
-        <div className="bg-card border rounded-3xl p-8 md:p-12 relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-8 opacity-10">
-            <Trophy className="h-40 w-40 text-primary" />
-          </div>
-          
-          <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-            <div className="text-center md:text-left">
-              <h2 className="text-sm font-bold uppercase tracking-widest text-primary mb-2">Next Match</h2>
-              <p className="text-3xl font-bold mb-4">Olodo Hot Stars vs. Nairobi Warriors</p>
-              <div className="flex flex-wrap gap-4 text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" /> April 15, 2026
-                </div>
-                <div className="flex items-center gap-2">
-                  <Trophy className="h-4 w-4" /> Regional League
+      {nextMatch && (
+        <section className="container px-4">
+          <div className="bg-card border rounded-3xl p-8 md:p-12 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-10">
+              <Trophy className="h-40 w-40 text-primary" />
+            </div>
+            
+            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+              <div className="text-center md:text-left">
+                <h2 className="text-sm font-bold uppercase tracking-widest text-primary mb-2">Next Match</h2>
+                <p className="text-3xl font-bold mb-4">
+                  {nextMatch.isHome ? "Olodo Hot Stars" : nextMatch.opponent} vs. {nextMatch.isHome ? nextMatch.opponent : "Olodo Hot Stars"}
+                </p>
+                <div className="flex flex-wrap gap-4 text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" /> {nextMatch.date}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Trophy className="h-4 w-4" /> {nextMatch.competition}
+                  </div>
                 </div>
               </div>
+              
+              <div className="flex flex-col items-center gap-4">
+                <div className="text-5xl font-black italic text-primary">{nextMatch.time || "TBD"}</div>
+                <p className="text-sm font-medium text-muted-foreground uppercase">Local Time</p>
+              </div>
+              
+              <Link to="/performance">
+                <Button variant="secondary" className="group">
+                  Match Details <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </Button>
+              </Link>
             </div>
-            
-            <div className="flex flex-col items-center gap-4">
-              <div className="text-5xl font-black italic text-primary">15:00</div>
-              <p className="text-sm font-medium text-muted-foreground uppercase">Local Time</p>
-            </div>
-            
-            <Button variant="secondary" className="group">
-              Match Details <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-            </Button>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Latest News Preview */}
       <section className="container px-4">
@@ -93,31 +138,36 @@ export default function Home() {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map((i) => (
+          {latestNews.map((item) => (
             <motion.div 
-              key={i}
+              key={item.id}
               whileHover={{ y: -5 }}
               className="group cursor-pointer"
             >
-              <div className="aspect-video rounded-2xl overflow-hidden mb-4 border border-white/5">
-                <img 
-                  src={`https://picsum.photos/seed/football${i}/800/450`} 
-                  alt="News" 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  referrerPolicy="no-referrer"
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="text-xs font-bold text-primary uppercase">Announcement</div>
-                <h3 className="text-xl font-bold leading-tight group-hover:text-primary transition-colors">
-                  New Training Facility Inaugurated for the Youth Team
-                </h3>
-                <p className="text-muted-foreground text-sm line-clamp-2">
-                  We are excited to announce the opening of our state-of-the-art training center in Olodo...
-                </p>
-              </div>
+              <Link to="/news">
+                <div className="aspect-video rounded-2xl overflow-hidden mb-4 border border-white/5">
+                  <img 
+                    src={item.imageUrl || `https://picsum.photos/seed/${item.id}/800/450`} 
+                    alt={item.title} 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="text-xs font-bold text-primary uppercase">{item.category}</div>
+                  <h3 className="text-xl font-bold leading-tight group-hover:text-primary transition-colors line-clamp-2">
+                    {item.title}
+                  </h3>
+                  <p className="text-muted-foreground text-sm line-clamp-2">
+                    {item.content}
+                  </p>
+                </div>
+              </Link>
             </motion.div>
           ))}
+          {!loading && latestNews.length === 0 && (
+            <p className="text-muted-foreground col-span-full text-center py-12">No news updates yet.</p>
+          )}
         </div>
       </section>
 

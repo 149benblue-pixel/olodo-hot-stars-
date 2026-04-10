@@ -56,3 +56,10 @@ export interface TeamStats {
   goalsConceded: number;
   averageRating: number;
 }
+
+export interface GalleryItem {
+  id: string;
+  imageUrl: string;
+  category: 'Match' | 'Training' | 'Celebrations';
+  date: string;
+}

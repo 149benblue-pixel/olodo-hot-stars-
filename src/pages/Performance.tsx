@@ -1,51 +1,79 @@
+import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { Card, CardContent } from "@/src/components/ui/card";
 import { Badge } from "@/src/components/ui/badge";
-import { Trophy, Calendar, MapPin, Clock, TrendingUp, Target, Shield } from "lucide-react";
+import { Trophy, Calendar, MapPin, TrendingUp, Target, Loader2 } from "lucide-react";
 import { Match, TeamStats } from "@/src/types";
-
-const stats: TeamStats = {
-  totalMatches: 24,
-  wins: 15,
-  draws: 5,
-  losses: 4,
-  goalsScored: 42,
-  goalsConceded: 18,
-  averageRating: 8.2
-};
-
-const matches: Match[] = [
-  {
-    id: "1",
-    opponent: "Nairobi Warriors",
-    date: "2026-04-15",
-    time: "15:00",
-    venue: "Olodo Community Grounds",
-    competition: "Regional League",
-    status: "upcoming",
-    isHome: true
-  },
-  {
-    id: "2",
-    opponent: "Lake Victoria FC",
-    date: "2026-04-05",
-    competition: "Regional League",
-    status: "played",
-    score: { home: 2, away: 1 },
-    isHome: true
-  },
-  {
-    id: "3",
-    opponent: "Highland Strikers",
-    date: "2026-03-28",
-    competition: "Cup Quarter-Final",
-    status: "played",
-    score: { home: 0, away: 2 },
-    isHome: false
-  }
-];
+import { db } from "@/src/firebase";
+import { collection, query, orderBy, onSnapshot } from "firebase/firestore";
 
 export default function Performance() {
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<TeamStats>({
+    totalMatches: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    goalsScored: 0,
+    goalsConceded: 0,
+    averageRating: 0
+  });
+
+  useEffect(() => {
+    const q = query(collection(db, "matches"), orderBy("date", "desc"));
+    const unsub = onSnapshot(q, (snapshot) => {
+      const fetchedMatches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match));
+      setMatches(fetchedMatches);
+      
+      // Calculate stats
+      const playedMatches = fetchedMatches.filter(m => m.status === 'played');
+      let wins = 0, draws = 0, losses = 0, goalsScored = 0, goalsConceded = 0;
+      
+      playedMatches.forEach(m => {
+        if (m.score) {
+          const homeScore = m.score.home;
+          const awayScore = m.score.away;
+          
+          if (m.isHome) {
+            goalsScored += homeScore;
+            goalsConceded += awayScore;
+            if (homeScore > awayScore) wins++;
+            else if (homeScore < awayScore) losses++;
+            else draws++;
+          } else {
+            goalsScored += awayScore;
+            goalsConceded += homeScore;
+            if (awayScore > homeScore) wins++;
+            else if (awayScore < homeScore) losses++;
+            else draws++;
+          }
+        }
+      });
+
+      setStats({
+        totalMatches: playedMatches.length,
+        wins,
+        draws,
+        losses,
+        goalsScored,
+        goalsConceded,
+        averageRating: 8.2 // Placeholder for now or calculate from player ratings
+      });
+      setLoading(false);
+    });
+
+    return () => unsub();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="container py-12 px-4">
       <div className="text-center mb-16">
@@ -58,7 +86,7 @@ export default function Performance() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-16">
         {[
-          { label: "Matches", value: stats.totalMatches, icon: Calendar },
+          { label: "Matches Played", value: stats.totalMatches, icon: Calendar },
           { label: "Wins", value: stats.wins, icon: Trophy, color: "text-primary" },
           { label: "Goals Scored", value: stats.goalsScored, icon: Target },
           { label: "Team Rating", value: stats.averageRating, icon: TrendingUp },
@@ -106,13 +134,16 @@ export default function Performance() {
                       </div>
                     ) : (
                       <div className="text-xl font-mono font-bold bg-muted px-3 py-1 rounded">
-                        {match.time}
+                        {match.time || "TBD"}
                       </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
             ))}
+            {matches.length === 0 && (
+              <p className="text-center py-12 text-muted-foreground">No matches recorded yet.</p>
+            )}
           </div>
         </div>
 
@@ -130,7 +161,7 @@ export default function Performance() {
                   <div key={i} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
                     <motion.div 
                       initial={{ height: 0 }}
-                      animate={{ height: `${(item.val / stats.totalMatches) * 100}%` }}
+                      animate={{ height: stats.totalMatches > 0 ? `${(item.val / stats.totalMatches) * 100}%` : "0%" }}
                       className={`${item.color} w-full rounded-t-lg min-h-[10px]`}
                     />
                     <span className="text-[10px] font-bold uppercase text-muted-foreground">{item.label}</span>

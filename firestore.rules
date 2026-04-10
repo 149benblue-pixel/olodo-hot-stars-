@@ -47,6 +47,12 @@
 //   - email: string (required)
 //   - role: string (required, ['admin', 'client'])
 //
+// Collection: gallery
+// Fields:
+//   - imageUrl: string (required, URL)
+//   - category: string (required, ['Match', 'Training', 'Celebrations'])
+//   - date: string (required, ISO 8601)
+//
 // ===============================================================
 
 rules_version = '2';
@@ -119,6 +125,13 @@ service cloud.firestore {
              (!('imageUrl' in data) || isValidUrl(data.imageUrl));
     }
 
+    function isValidGallery(data) {
+      return data.keys().hasAll(['imageUrl', 'category', 'date']) &&
+             isValidUrl(data.imageUrl) &&
+             data.category in ['Match', 'Training', 'Celebrations'] &&
+             isValidDateString(data.date);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -144,6 +157,12 @@ service cloud.firestore {
     match /news/{newsId} {
       allow read: if true;
       allow create, update: if isAdmin() && isValidNews(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /gallery/{photoId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidGallery(request.resource.data);
       allow delete: if isAdmin();
     }
 
