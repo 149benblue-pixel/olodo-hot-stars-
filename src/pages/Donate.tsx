@@ -16,16 +16,18 @@ export default function Donate() {
 
   return (
     <div className="container py-20 px-4 max-w-4xl mx-auto">
-      <div className="text-center mb-16">
+      <div className="text-center mb-20">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/20 text-primary mb-6"
+          className="inline-flex items-center justify-center w-24 h-24 bg-primary/20 text-primary mb-8"
         >
-          <Heart className="h-10 w-10 fill-primary" />
+          <Heart className="h-12 w-12 fill-primary" />
         </motion.div>
-        <h1 className="text-5xl font-black italic mb-4">SUPPORT THE STARS</h1>
-        <p className="text-xl text-muted-foreground">
+        <h1 className="text-[10vw] md:text-[8vw] font-black italic mb-4 leading-none uppercase tracking-tighter">
+          SUPPORT <span className="text-primary">STARS</span>
+        </h1>
+        <p className="text-xl text-muted-foreground font-medium">
           Your contributions help us with equipment, travel, and nurturing the next generation of football talent.
         </p>
       </div>
@@ -41,16 +43,16 @@ export default function Donate() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                <span className="text-muted-foreground">Paybill Number</span>
-                <span className="font-mono font-bold text-lg">123456</span>
+                <span className="text-muted-foreground">Payment Method</span>
+                <span className="font-bold">Pochi la biashara</span>
               </div>
               <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                <span className="text-muted-foreground">Account Name</span>
-                <span className="font-mono font-bold text-lg">OLODO STARS</span>
+                <span className="text-muted-foreground">Number</span>
+                <span className="font-mono font-bold text-lg">+254 790 244 196</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Till Number</span>
-                <span className="font-mono font-bold text-lg">987654</span>
+                <span className="text-muted-foreground">Account Name</span>
+                <span className="font-mono font-bold text-lg">OLODO STARS</span>
               </div>
             </CardContent>
           </Card>

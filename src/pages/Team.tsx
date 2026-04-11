@@ -4,17 +4,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/ta
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { Badge } from "@/src/components/ui/badge";
 import { ScrollArea } from "@/src/components/ui/scroll-area";
-import { User, Shield, Phone, Star, Loader2 } from "lucide-react";
+import { User, Shield, Phone, Star, Loader2, X, Trophy, Target, TrendingUp } from "lucide-react";
 import { Player, Official } from "@/src/types";
 import { db } from "@/src/firebase";
 import { collection, onSnapshot } from "firebase/firestore";
 import { cn } from "@/src/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/src/components/ui/dialog";
+import { Button } from "@/src/components/ui/button";
 
 export default function Team() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [officials, setOfficials] = useState<Official[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"players" | "officials">("players");
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
   useEffect(() => {
     const unsubPlayers = onSnapshot(collection(db, "players"), (snapshot) => {
@@ -41,10 +44,12 @@ export default function Team() {
   }
 
   return (
-    <div className="container py-12 px-4">
-      <div className="text-center mb-12">
-        <h1 className="text-5xl font-black italic mb-4">OUR TEAM</h1>
-        <p className="text-muted-foreground max-w-2xl mx-auto">
+    <div className="container py-20 px-4">
+      <div className="text-center mb-20">
+        <h1 className="text-[10vw] md:text-[8vw] font-black italic mb-4 leading-none uppercase tracking-tighter">
+          OUR <span className="text-primary">SQUAD</span>
+        </h1>
+        <p className="text-muted-foreground max-w-2xl mx-auto font-medium">
           The heart and soul of Olodo Hot Stars. Meet the players and officials who make it all happen.
         </p>
       </div>
@@ -81,7 +86,8 @@ export default function Team() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 whileHover={{ y: -10 }}
-                className="group"
+                className="group cursor-pointer"
+                onClick={() => setSelectedPlayer(player)}
               >
                 <Card className="overflow-hidden border-white/10 bg-card/50 backdrop-blur">
                   <div className="aspect-[4/5] relative overflow-hidden">
@@ -161,6 +167,80 @@ export default function Team() {
           </div>
         )}
       </div>
+
+      <Dialog open={!!selectedPlayer} onOpenChange={(open) => !open && setSelectedPlayer(null)}>
+        <DialogContent className="bg-card border-white/10 text-foreground max-w-2xl p-0 overflow-hidden">
+          {selectedPlayer && (
+            <div className="flex flex-col md:flex-row">
+              <div className="w-full md:w-1/2 aspect-[4/5] relative">
+                <img 
+                  src={selectedPlayer.photoUrl || `https://picsum.photos/seed/${selectedPlayer.id}/400/500`} 
+                  alt={selectedPlayer.name} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute top-4 left-4">
+                  <Badge className="bg-primary text-primary-foreground text-2xl font-black px-4 py-2">
+                    #{selectedPlayer.number}
+                  </Badge>
+                </div>
+              </div>
+              <div className="w-full md:w-1/2 p-8 flex flex-col gap-6">
+                <div>
+                  <p className="text-primary font-bold uppercase text-xs tracking-widest mb-1">{selectedPlayer.position}</p>
+                  <h2 className="text-3xl font-black italic uppercase tracking-tighter">{selectedPlayer.name}</h2>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl bg-muted/50 border border-white/5">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Matches</p>
+                    <p className="text-2xl font-black italic">{selectedPlayer.stats?.matchesPlayed || 0}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-muted/50 border border-white/5">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Goals</p>
+                    <p className="text-2xl font-black italic text-primary">{selectedPlayer.stats?.goals || 0}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-muted/50 border border-white/5">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Assists</p>
+                    <p className="text-2xl font-black italic">{selectedPlayer.stats?.assists || 0}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-muted/50 border border-white/5">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Rating</p>
+                    <p className="text-2xl font-black italic text-primary">{selectedPlayer.stats?.rating || 0}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-white/5">
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                      <Trophy className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <p className="font-bold">Season Performance</p>
+                      <p className="text-xs text-muted-foreground">Top tier contribution to the squad</p>
+                    </div>
+                  </div>
+                  {selectedPlayer.contact && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                        <Phone className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-bold">Contact</p>
+                        <p className="text-xs text-muted-foreground">{selectedPlayer.contact}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Button className="mt-auto bg-primary text-primary-foreground font-bold italic" onClick={() => setSelectedPlayer(null)}>
+                  CLOSE PROFILE
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

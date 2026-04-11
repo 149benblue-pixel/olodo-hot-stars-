@@ -7,10 +7,10 @@ import { Label } from "@/src/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/src/components/ui/tabs";
 import { Badge } from "@/src/components/ui/badge";
 import { ScrollArea } from "@/src/components/ui/scroll-area";
-import { Plus, Edit2, Trash2, Save, X, LogIn, LayoutDashboard, Users, Trophy, Newspaper, Image as ImageIcon, Loader2, Briefcase, Phone, Upload, Clock, MapPin } from "lucide-react";
+import { Plus, Edit2, Trash2, Save, X, LogIn, LayoutDashboard, Users, Trophy, Newspaper, Image as ImageIcon, Loader2, Briefcase, Phone, Upload, Clock, MapPin, Eye, Shield } from "lucide-react";
 import { useAuth } from "@/src/AuthContext";
 import { signInWithGoogle, logout, db, storage } from "@/src/firebase";
-import { collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, onSnapshot, query, addDoc, updateDoc, deleteDoc, doc, getDoc } from "firebase/firestore";
 import { ref as sRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { Player, Match, NewsItem, Official, GalleryItem, Position } from "@/src/types";
 import { handleFirestoreError, OperationType } from "@/src/lib/firestore-errors";
@@ -32,6 +32,9 @@ export default function Admin() {
   const [officials, setOfficials] = useState<Official[]>([]);
   const [gallery, setGallery] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<{ id: string, type: 'player' | 'official' | 'match' | 'news' | 'gallery', label: string } | null>(null);
+  const [viewingPlayer, setViewingPlayer] = useState<Player | null>(null);
 
   // Form states
   const [isPlayerDialogOpen, setIsPlayerDialogOpen] = useState(false);
@@ -62,7 +65,27 @@ export default function Admin() {
   });
 
   useEffect(() => {
-    if (!isAuthReady || !user) return;
+    if (!isAuthReady || !user) {
+      setLoading(false);
+      return;
+    }
+
+    // Check if user is admin
+    const checkAdmin = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const isDefaultAdmin = user.email === "149benblue@gmail.com";
+        if (isDefaultAdmin || (userDoc.exists() && userDoc.data().role === 'admin')) {
+          setIsAdminUser(true);
+        } else {
+          setIsAdminUser(false);
+        }
+      } catch (error) {
+        console.error("Error checking admin status:", error);
+        setIsAdminUser(false);
+      }
+    };
+    checkAdmin();
 
     const unsubPlayers = onSnapshot(collection(db, "players"), 
       (snapshot) => {
@@ -74,7 +97,8 @@ export default function Admin() {
 
     const unsubMatches = onSnapshot(collection(db, "matches"), 
       (snapshot) => {
-        setMatches(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match)));
+        const fetchedMatches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match));
+        setMatches(fetchedMatches.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       },
       (error) => handleFirestoreError(error, OperationType.LIST, "matches")
     );
@@ -133,7 +157,6 @@ export default function Admin() {
   };
 
   const handleDeleteOfficial = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this official?")) return;
     try {
       await deleteDoc(doc(db, "officials", id));
     } catch (error) {
@@ -195,7 +218,6 @@ export default function Admin() {
   };
 
   const handleDeletePlayer = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this player?")) return;
     try {
       await deleteDoc(doc(db, "players", id));
     } catch (error) {
@@ -316,7 +338,6 @@ export default function Admin() {
   };
 
   const handleDeleteMatch = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this match?")) return;
     try {
       await deleteDoc(doc(db, "matches", id));
     } catch (error) {
@@ -374,7 +395,6 @@ export default function Admin() {
   };
 
   const handleDeleteNews = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this article?")) return;
     try {
       await deleteDoc(doc(db, "news", id));
     } catch (error) {
@@ -402,7 +422,6 @@ export default function Admin() {
   };
 
   const handleDeleteGallery = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this photo?")) return;
     try {
       await deleteDoc(doc(db, "gallery", id));
     } catch (error) {
@@ -438,7 +457,7 @@ export default function Admin() {
     player.number.toString().includes(playerSearch)
   );
 
-  if (authLoading) {
+  if (authLoading || (isAuthReady && user && !isAdminUser && loading)) {
     return (
       <div className="container min-h-[70vh] flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -459,6 +478,29 @@ export default function Admin() {
             </p>
             <Button onClick={signInWithGoogle} className="w-full bg-primary text-primary-foreground font-bold py-6">
               <LogIn className="mr-2 h-4 w-4" /> Sign In with Google
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isAdminUser && !loading) {
+    return (
+      <div className="container min-h-[70vh] flex items-center justify-center px-4">
+        <Card className="w-full max-w-md border-destructive/20 bg-card/50 backdrop-blur">
+          <CardHeader className="text-center">
+            <div className="mx-auto w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
+              <Shield className="h-8 w-8 text-destructive" />
+            </div>
+            <CardTitle className="text-3xl font-black italic">NOT AUTHORIZED</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-center">
+            <p className="text-muted-foreground mb-4">
+              Your account ({user.email}) does not have administrator privileges. Please contact the system owner if you believe this is an error.
+            </p>
+            <Button onClick={logout} variant="outline" className="w-full font-bold py-6">
+              Sign Out
             </Button>
           </CardContent>
         </Card>
@@ -569,7 +611,7 @@ export default function Admin() {
                       </div>
                       {playerForm.photoUrl && (
                         <div className="mt-2 relative w-20 h-20 rounded-lg overflow-hidden border border-white/10 bg-muted">
-                          <img src={playerForm.photoUrl} alt="Preview" className="w-full h-full object-cover" />
+                          <img src={playerForm.photoUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         </div>
                       )}
                     </div>
@@ -618,52 +660,61 @@ export default function Admin() {
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredPlayers.map((player) => {
-              const winRate = player.stats.matchesPlayed > 0 ? (player.stats.wins / player.stats.matchesPlayed * 100).toFixed(1) : "0";
-              const conversionRate = player.stats.shots > 0 ? (player.stats.goals / player.stats.shots * 100).toFixed(1) : "0";
-              const assistRatio = player.stats.goals > 0 ? (player.stats.assists / player.stats.goals).toFixed(2) : "0";
+          <div className="overflow-x-auto rounded-xl border border-white/10 bg-card/30">
+            <table className="w-full text-left border-collapse min-w-[800px]">
+              <thead>
+                <tr className="border-b border-white/10 bg-white/5">
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Player</th>
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Position</th>
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground text-center">#</th>
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground text-center">Matches</th>
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground text-center text-primary">Win Rate</th>
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground text-center text-primary">Conv. Rate</th>
+                  <th className="p-4 text-[10px] font-bold uppercase tracking-widest text-muted-foreground text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPlayers.map((player) => {
+                  const winRate = player.stats.matchesPlayed > 0 ? (player.stats.wins / player.stats.matchesPlayed * 100).toFixed(1) : "0";
+                  const conversionRate = player.stats.shots > 0 ? (player.stats.goals / player.stats.shots * 100).toFixed(1) : "0";
 
-              return (
-                <Card key={player.id} className="border-white/5 bg-card/50 overflow-hidden">
-                  <CardContent className="p-0">
-                    <div className="p-4 flex items-center gap-4">
-                      <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted">
-                        <img src={player.photoUrl || `https://picsum.photos/seed/${player.id}/100/100`} alt={player.name} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-bold">{player.name}</h3>
-                        <p className="text-xs text-muted-foreground uppercase">{player.position} • #{player.number}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => openPlayerDialog(player)}>
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDeletePlayer(player.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="bg-black/20 p-4 grid grid-cols-3 gap-2 border-t border-white/5">
-                      <div className="text-center">
-                        <p className="text-[10px] text-muted-foreground uppercase font-bold">Win Rate</p>
-                        <p className="text-sm font-bold text-primary">{winRate}%</p>
-                      </div>
-                      <div className="text-center border-x border-white/5">
-                        <p className="text-[10px] text-muted-foreground uppercase font-bold">Conv. Rate</p>
-                        <p className="text-sm font-bold text-primary">{conversionRate}%</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-[10px] text-muted-foreground uppercase font-bold">A/G Ratio</p>
-                        <p className="text-sm font-bold text-primary">{assistRatio}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  return (
+                    <tr key={player.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-lg overflow-hidden bg-muted shrink-0">
+                            <img src={player.photoUrl || `https://picsum.photos/seed/${player.id}/100/100`} alt={player.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          </div>
+                          <span className="font-bold">{player.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <Badge variant="outline" className="text-[10px] uppercase border-white/10">{player.position}</Badge>
+                      </td>
+                      <td className="p-4 text-center font-mono font-bold">{player.number}</td>
+                      <td className="p-4 text-center font-bold">{player.stats.matchesPlayed}</td>
+                      <td className="p-4 text-center font-black italic text-primary">{winRate}%</td>
+                      <td className="p-4 text-center font-black italic text-primary">{conversionRate}%</td>
+                      <td className="p-4 text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:bg-white/10" onClick={() => setViewingPlayer(player)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-primary hover:bg-primary/10" onClick={() => openPlayerDialog(player)}>
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => setItemToDelete({ id: player.id, type: 'player', label: 'player' })}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
             {filteredPlayers.length === 0 && !loading && (
-              <p className="text-muted-foreground col-span-full text-center py-12">No players found matching your search.</p>
+              <div className="p-12 text-center text-muted-foreground">No players found matching your search.</div>
             )}
           </div>
         </TabsContent>
@@ -744,7 +795,7 @@ export default function Admin() {
                     </div>
                     {officialForm.photoUrl && (
                       <div className="mt-2 relative w-20 h-20 rounded-lg overflow-hidden border border-white/10 bg-muted">
-                        <img src={officialForm.photoUrl} alt="Preview" className="w-full h-full object-cover" />
+                        <img src={officialForm.photoUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       </div>
                     )}
                   </div>
@@ -754,7 +805,7 @@ export default function Admin() {
                       id="contact" 
                       value={officialForm.contact}
                       onChange={(e) => setOfficialForm({ ...officialForm, contact: e.target.value })}
-                      placeholder="e.g. +254 700 000 000" 
+                      placeholder="e.g. +254 716 773 610" 
                       className="bg-background border-white/10" 
                     />
                   </div>
@@ -774,7 +825,7 @@ export default function Admin() {
               <Card key={official.id} className="border-white/5 bg-card/50">
                 <CardContent className="p-4 flex items-center gap-4">
                   <div className="h-16 w-16 rounded-full overflow-hidden bg-muted border-2 border-primary/20">
-                    <img src={official.photoUrl || `https://picsum.photos/seed/${official.id}/100/100`} alt={official.name} className="w-full h-full object-cover" />
+                    <img src={official.photoUrl || `https://picsum.photos/seed/${official.id}/100/100`} alt={official.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   </div>
                   <div className="flex-1">
                     <h3 className="font-bold">{official.name}</h3>
@@ -789,7 +840,7 @@ export default function Admin() {
                     <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => openOfficialDialog(official)}>
                       <Edit2 className="h-4 w-4" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDeleteOfficial(official.id)}>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setItemToDelete({ id: official.id, type: 'official', label: 'official' })}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -904,7 +955,7 @@ export default function Admin() {
                       <Button size="icon" variant="ghost" className="h-10 w-10 text-primary hover:bg-primary/10" onClick={() => openMatchDialog(match)}>
                         <Edit2 className="h-5 w-5" />
                       </Button>
-                      <Button size="icon" variant="ghost" className="h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteMatch(match.id)}>
+                      <Button size="icon" variant="ghost" className="h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => setItemToDelete({ id: match.id, type: 'match', label: 'match' })}>
                         <Trash2 className="h-5 w-5" />
                       </Button>
                     </div>
@@ -985,7 +1036,7 @@ export default function Admin() {
                     </div>
                     {newsForm.imageUrl && (
                       <div className="mt-2 relative w-full aspect-video rounded-lg overflow-hidden border border-white/10 bg-muted">
-                        <img src={newsForm.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                        <img src={newsForm.imageUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       </div>
                     )}
                   </div>
@@ -1008,7 +1059,7 @@ export default function Admin() {
               <Card key={item.id} className="border-white/5 bg-card/50">
                 <CardContent className="p-4 flex items-center gap-6">
                   <div className="h-20 w-32 rounded-lg overflow-hidden bg-muted shrink-0">
-                    <img src={item.imageUrl || `https://picsum.photos/seed/${item.id}/200/150`} alt="News" className="w-full h-full object-cover" />
+                    <img src={item.imageUrl || `https://picsum.photos/seed/${item.id}/200/150`} alt="News" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   </div>
                   <div className="flex-1">
                     <h3 className="font-bold line-clamp-1">{item.title}</h3>
@@ -1017,7 +1068,7 @@ export default function Admin() {
                   </div>
                   <div className="flex gap-2">
                     <Button size="icon" variant="ghost" className="h-8 w-8 text-primary" onClick={() => openNewsDialog(item)}><Edit2 className="h-4 w-4" /></Button>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDeleteNews(item.id)}><Trash2 className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setItemToDelete({ id: item.id, type: 'news', label: 'article' })}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </CardContent>
               </Card>
@@ -1081,7 +1132,7 @@ export default function Admin() {
                     </div>
                     {galleryForm.imageUrl && (
                       <div className="mt-2 relative w-full aspect-square rounded-lg overflow-hidden border border-white/10 bg-muted">
-                        <img src={galleryForm.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                        <img src={galleryForm.imageUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       </div>
                     )}
                   </div>
@@ -1108,9 +1159,9 @@ export default function Admin() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {gallery.map((photo) => (
               <div key={photo.id} className="group relative aspect-square rounded-xl overflow-hidden bg-muted">
-                <img src={photo.imageUrl} alt="Gallery" className="w-full h-full object-cover" />
+                <img src={photo.imageUrl} alt="Gallery" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <Button size="icon" variant="ghost" className="h-8 w-8 text-white hover:text-destructive" onClick={() => handleDeleteGallery(photo.id)}>
+                  <Button size="icon" variant="ghost" className="h-8 w-8 text-white hover:text-destructive" onClick={() => setItemToDelete({ id: photo.id, type: 'gallery', label: 'photo' })}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -1125,6 +1176,95 @@ export default function Admin() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!itemToDelete} onOpenChange={(open) => !open && setItemToDelete(null)}>
+        <DialogContent className="bg-card border-white/10 text-foreground">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold italic">Confirm Deletion</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-muted-foreground">
+            Are you sure you want to delete this {itemToDelete?.label}? This action cannot be undone.
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setItemToDelete(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={() => {
+              if (itemToDelete) {
+                if (itemToDelete.type === 'player') handleDeletePlayer(itemToDelete.id);
+                if (itemToDelete.type === 'official') handleDeleteOfficial(itemToDelete.id);
+                if (itemToDelete.type === 'match') handleDeleteMatch(itemToDelete.id);
+                if (itemToDelete.type === 'news') handleDeleteNews(itemToDelete.id);
+                if (itemToDelete.type === 'gallery') handleDeleteGallery(itemToDelete.id);
+                setItemToDelete(null);
+              }
+            }}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewingPlayer} onOpenChange={(open) => !open && setViewingPlayer(null)}>
+        <DialogContent className="bg-card border-white/10 text-foreground max-w-2xl p-0 overflow-hidden">
+          {viewingPlayer && (
+            <div className="flex flex-col md:flex-row">
+              <div className="w-full md:w-1/2 aspect-[4/5] relative">
+                <img 
+                  src={viewingPlayer.photoUrl || `https://picsum.photos/seed/${viewingPlayer.id}/400/500`} 
+                  alt={viewingPlayer.name} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute top-4 left-4">
+                  <Badge className="bg-primary text-primary-foreground text-2xl font-black px-4 py-2">
+                    #{viewingPlayer.number}
+                  </Badge>
+                </div>
+              </div>
+              <div className="w-full md:w-1/2 p-8 flex flex-col gap-6">
+                <div>
+                  <p className="text-primary font-bold uppercase text-xs tracking-widest mb-1">{viewingPlayer.position}</p>
+                  <h2 className="text-3xl font-black italic uppercase tracking-tighter">{viewingPlayer.name}</h2>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl bg-muted/50 border border-white/5">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Matches</p>
+                    <p className="text-2xl font-black italic">{viewingPlayer.stats?.matchesPlayed || 0}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-muted/50 border border-white/5">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Goals</p>
+                    <p className="text-2xl font-black italic text-primary">{viewingPlayer.stats?.goals || 0}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-muted/50 border border-white/5">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Assists</p>
+                    <p className="text-2xl font-black italic">{viewingPlayer.stats?.assists || 0}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-muted/50 border border-white/5">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold mb-1">Rating</p>
+                    <p className="text-2xl font-black italic text-primary">{viewingPlayer.stats?.rating || 0}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 pt-4 border-t border-white/5">
+                  {viewingPlayer.contact && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                        <Phone className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="font-bold">Contact</p>
+                        <p className="text-xs text-muted-foreground">{viewingPlayer.contact}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Button className="mt-auto bg-primary text-primary-foreground font-bold italic" onClick={() => setViewingPlayer(null)}>
+                  CLOSE PROFILE
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

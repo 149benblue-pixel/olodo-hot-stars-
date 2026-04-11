@@ -81,10 +81,12 @@ export default function Performance() {
   }
 
   return (
-    <div className="container py-12 px-4">
-      <div className="text-center mb-16">
-        <h1 className="text-5xl font-black italic mb-4 tracking-tighter">PERFORMANCE</h1>
-        <p className="text-muted-foreground max-w-2xl mx-auto">
+    <div className="container py-20 px-4">
+      <div className="text-center mb-20">
+        <h1 className="text-[10vw] md:text-[8vw] font-black italic mb-4 leading-none uppercase tracking-tighter">
+          PERFOR<span className="text-primary">MANCE</span>
+        </h1>
+        <p className="text-muted-foreground max-w-2xl mx-auto font-medium">
           Tracking our journey through the season. Every goal, every win, every step forward.
         </p>
       </div>

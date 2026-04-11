@@ -4,6 +4,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
+import Dashboard from "./pages/Dashboard";
 import Team from "./pages/Team";
 import Performance from "./pages/Performance";
 import Gallery from "./pages/Gallery";
@@ -21,6 +22,7 @@ export default function App() {
             <main className="flex-grow">
               <Routes>
                 <Route path="/" element={<Home />} />
+                <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/team" element={<Team />} />
                 <Route path="/performance" element={<Performance />} />
                 <Route path="/gallery" element={<Gallery />} />

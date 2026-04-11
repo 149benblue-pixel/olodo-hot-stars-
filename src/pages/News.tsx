@@ -29,10 +29,12 @@ export default function News() {
   }
 
   return (
-    <div className="container py-12 px-4 max-w-5xl mx-auto">
-      <div className="text-center mb-16">
-        <h1 className="text-5xl font-black italic mb-4">NEWS & UPDATES</h1>
-        <p className="text-muted-foreground">
+    <div className="container py-20 px-4 max-w-5xl mx-auto">
+      <div className="text-center mb-20">
+        <h1 className="text-[10vw] md:text-[8vw] font-black italic mb-4 leading-none uppercase tracking-tighter">
+          NEWS & <span className="text-primary">UPDATES</span>
+        </h1>
+        <p className="text-muted-foreground font-medium">
           Stay informed with the latest happenings at Olodo Hot Stars.
         </p>
       </div>

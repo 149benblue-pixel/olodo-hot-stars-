@@ -14,6 +14,7 @@ import {
   Target,
   Clock,
   MapPin,
+  Heart,
   Image as ImageIcon
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -88,7 +89,7 @@ export default function Home() {
           }
         }
         if (m.attendance) {
-          totalAttendance += m.attendance;
+          totalAttendance += Number(m.attendance);
           attendanceCount++;
         }
       });
@@ -124,213 +125,210 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col gap-12 pb-20">
-      {/* Hero Dashboard Header */}
-      <section className="relative pt-20 pb-12 overflow-hidden bg-black">
-        <div className="absolute inset-0 z-0 opacity-30">
+    <div className="flex flex-col gap-0 pb-20">
+      {/* Hero Section - Massive Typography */}
+      <section className="relative min-h-[90vh] flex items-center overflow-hidden bg-black border-b border-white/10">
+        <div className="absolute inset-0 z-0">
           <img 
             src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=2000&auto=format&fit=crop" 
             alt="Stadium" 
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover opacity-40 grayscale hover:grayscale-0 transition-all duration-1000"
             referrerPolicy="no-referrer"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
         </div>
         
         <div className="container relative z-10 px-4">
-          <div className="flex flex-col md:flex-row justify-between items-end gap-8">
-            <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold mb-4 uppercase tracking-widest">
-                <ShieldCheck className="h-3 w-3" />
-                Olodo Hot Stars Dashboard
-              </div>
-              <h1 className="text-5xl md:text-7xl font-black italic tracking-tighter uppercase">
-                THE <span className="text-primary">HUB</span>
-              </h1>
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="max-w-5xl"
+          >
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em] mb-6">
+              <ShieldCheck className="h-3 w-3" />
+              Official Club Portal
             </div>
+            <h1 className="text-[15vw] md:text-[12vw] font-black leading-[0.85] italic uppercase tracking-tighter mb-8">
+              HOT <span className="text-primary">STARS</span><br />
+              <span className="text-outline text-transparent">RISING</span>
+            </h1>
             
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full md:w-auto">
-              <div className="bg-card/50 backdrop-blur border border-white/5 p-4 rounded-2xl text-center">
-                <p className="text-2xl font-black italic text-primary">{winRate}%</p>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Win Rate</p>
-              </div>
-              <div className="bg-card/50 backdrop-blur border border-white/5 p-4 rounded-2xl text-center">
-                <p className="text-2xl font-black italic">{stats.totalMatches}</p>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Games</p>
-              </div>
-              <div className="bg-card/50 backdrop-blur border border-white/5 p-4 rounded-2xl text-center">
-                <p className="text-2xl font-black italic">{avgAttendance}</p>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Avg Fans</p>
-              </div>
-              <div className="bg-card/50 backdrop-blur border border-white/5 p-4 rounded-2xl text-center">
-                <p className="text-2xl font-black italic text-primary">{stats.wins}</p>
-                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Victories</p>
+            <div className="flex flex-wrap gap-8 items-center">
+              <Link to="/team">
+                <Button className="h-16 px-10 bg-primary text-primary-foreground font-black italic text-lg hover:scale-105 transition-transform">
+                  MEET THE SQUAD
+                </Button>
+              </Link>
+              <div className="flex gap-12">
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Win Rate</p>
+                  <p className="text-4xl font-black italic text-primary">{winRate}%</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Goals</p>
+                  <p className="text-4xl font-black italic">{stats.goalsScored}</p>
+                </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
-      <div className="container px-4 flex flex-col gap-12">
-        {/* Next Match */}
-        {nextMatch && (
-          <Card className="border-primary/20 bg-primary/5 overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-6 opacity-5">
-              <Trophy className="h-32 w-32" />
+      {/* Bento Grid Content */}
+      <section className="container px-4 -mt-20 relative z-20">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+          
+          {/* Next Match - Large Bento Item */}
+          <motion.div 
+            whileHover={{ y: -5 }}
+            className="md:col-span-8 bg-card border border-white/10 p-8 flex flex-col justify-between min-h-[300px] relative overflow-hidden group"
+          >
+            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+              <Trophy className="h-48 w-48" />
             </div>
-            <CardHeader>
-              <CardTitle className="text-sm font-bold uppercase tracking-widest text-primary">UPCOMING FIXTURE</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col md:flex-row items-center justify-between gap-8 pb-8">
-              <div className="text-center md:text-left">
-                <h3 className="text-2xl md:text-3xl font-black italic mb-2">
-                  {nextMatch.isHome ? "Olodo Hot Stars" : nextMatch.opponent} vs. {nextMatch.isHome ? nextMatch.opponent : "Olodo Hot Stars"}
-                </h3>
-                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground font-bold">
-                  <span className="flex items-center gap-1"><Calendar className="h-4 w-4" /> {nextMatch.date}</span>
-                  <span className="flex items-center gap-1"><Clock className="h-4 w-4" /> {nextMatch.time || "TBD"}</span>
-                  <span className="flex items-center gap-1"><MapPin className="h-4 w-4" /> {nextMatch.venue || "TBD"}</span>
-                </div>
-              </div>
-              <Link to="/performance">
-                <Button className="bg-primary text-primary-foreground font-bold group">
-                  Match Center <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
+            <div>
+              <Badge className="bg-primary text-primary-foreground mb-4">NEXT FIXTURE</Badge>
+              {nextMatch ? (
+                <>
+                  <h2 className="text-4xl md:text-6xl font-black italic uppercase tracking-tighter mb-4">
+                    {nextMatch.isHome ? "HOT STARS" : nextMatch.opponent} <span className="text-primary">VS</span> {nextMatch.isHome ? nextMatch.opponent : "HOT STARS"}
+                  </h2>
+                  <div className="flex flex-wrap gap-6 text-sm font-bold uppercase tracking-widest text-muted-foreground">
+                    <span className="flex items-center gap-2 text-foreground"><Calendar className="h-4 w-4 text-primary" /> {nextMatch.date}</span>
+                    <span className="flex items-center gap-2 text-foreground"><Clock className="h-4 w-4 text-primary" /> {nextMatch.time || "TBD"}</span>
+                    <span className="flex items-center gap-2 text-foreground"><MapPin className="h-4 w-4 text-primary" /> {nextMatch.venue || "TBD"}</span>
+                  </div>
+                </>
+              ) : (
+                <h2 className="text-4xl font-black italic uppercase">No upcoming matches</h2>
+              )}
+            </div>
+            <Link to="/performance" className="mt-8">
+              <Button variant="outline" className="border-white/10 hover:bg-primary hover:text-primary-foreground font-bold italic">
+                MATCH CENTER <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+          </motion.div>
 
-        {/* Recent Performance */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-black italic uppercase tracking-tight">Recent Results</h2>
-            <Link to="/performance" className="text-xs font-bold text-primary hover:underline uppercase tracking-widest">View All</Link>
+          {/* Quick Stats - Medium Bento Item */}
+          <div className="md:col-span-4 grid grid-cols-2 gap-4">
+            <div className="bg-primary p-6 flex flex-col justify-between">
+              <Target className="h-8 w-8 text-primary-foreground/50" />
+              <div>
+                <p className="text-5xl font-black italic text-primary-foreground leading-none">{stats.wins}</p>
+                <p className="text-[10px] font-bold uppercase text-primary-foreground/70 tracking-widest mt-2">Victories</p>
+              </div>
+            </div>
+            <div className="bg-card border border-white/10 p-6 flex flex-col justify-between">
+              <Users className="h-8 w-8 text-primary" />
+              <div>
+                <p className="text-5xl font-black italic leading-none">{avgAttendance}</p>
+                <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mt-2">Avg Fans</p>
+              </div>
+            </div>
+            <div className="bg-card border border-white/10 p-6 flex flex-col justify-between col-span-2">
+              <div className="flex justify-between items-end">
+                <div>
+                  <p className="text-4xl font-black italic leading-none">8.5</p>
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mt-2">Team Rating</p>
+                </div>
+                <TrendingUp className="h-12 w-12 text-primary opacity-20" />
+              </div>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {matches.filter(m => m.status === 'played').slice(0, 3).map((match) => (
-              <Card key={match.id} className="border-white/5 bg-card/30">
-                <CardContent className="p-4 flex items-center justify-between">
+
+          {/* News Section - Wide Bento */}
+          <div className="md:col-span-12 mt-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-3xl font-black italic uppercase tracking-tighter">LATEST <span className="text-primary">NEWS</span></h2>
+              <Link to="/news">
+                <Button variant="link" className="text-primary font-bold uppercase tracking-widest text-xs">View All News</Button>
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {latestNews.map((item) => (
+                <motion.div 
+                  key={item.id}
+                  whileHover={{ y: -5 }}
+                  className="group cursor-pointer"
+                >
+                  <Card className="border-white/5 bg-card/50 overflow-hidden h-full flex flex-col">
+                    <div className="aspect-[16/10] relative overflow-hidden">
+                      <img 
+                        src={item.imageUrl || `https://picsum.photos/seed/${item.id}/600/400`} 
+                        alt={item.title} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute top-4 left-4">
+                        <Badge className="bg-primary text-primary-foreground font-black text-[10px]">{item.category}</Badge>
+                      </div>
+                    </div>
+                    <CardContent className="p-6 flex-1 flex flex-col">
+                      <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2">{item.date}</p>
+                      <h3 className="text-xl font-bold mb-3 leading-tight group-hover:text-primary transition-colors">{item.title}</h3>
+                      <p className="text-sm text-muted-foreground line-clamp-2 mb-6">{item.content}</p>
+                      <Link to="/news" className="mt-auto inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary">
+                        Read More <ArrowRight className="h-3 w-3" />
+                      </Link>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+          {/* Recent Results - Side Bento */}
+          <div className="md:col-span-12 lg:col-span-6 mt-8">
+            <h2 className="text-2xl font-black italic uppercase tracking-tighter mb-6">RECENT <span className="text-primary">RESULTS</span></h2>
+            <div className="space-y-3">
+              {matches.filter(m => m.status === 'played').slice(0, 4).map((match) => (
+                <div key={match.id} className="bg-card border border-white/5 p-4 flex items-center justify-between group hover:border-primary/50 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className={`w-2 h-10 rounded-full ${
+                    <div className={`w-1 h-8 ${
                       match.score && (
                         (match.isHome && match.score.home > match.score.away) || 
                         (!match.isHome && match.score.away > match.score.home)
                       ) ? 'bg-primary' : (match.score && match.score.home === match.score.away ? 'bg-muted-foreground' : 'bg-destructive')
                     }`} />
                     <div>
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase">{match.competition} • {match.date}</p>
-                      <h4 className="font-bold text-sm">
-                        {match.isHome ? "Olodo Hot Stars" : match.opponent} vs. {match.isHome ? match.opponent : "Olodo Hot Stars"}
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase">{match.date} • {match.competition}</p>
+                      <h4 className="font-bold text-sm uppercase italic">
+                        {match.isHome ? "HOT STARS" : match.opponent} vs {match.isHome ? match.opponent : "HOT STARS"}
                       </h4>
                     </div>
                   </div>
-                  <div className="text-xl font-black italic text-primary">
+                  <div className="text-2xl font-black italic text-primary">
                     {match.score?.home} - {match.score?.away}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Team News Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-black italic uppercase tracking-tight">Team News</h2>
-            <Link to="/news" className="text-xs font-bold text-primary hover:underline uppercase tracking-widest">Read More</Link>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {latestNews.slice(0, 3).map((item) => (
-              <Card key={item.id} className="border-white/5 bg-card/30 overflow-hidden group">
-                <div className="aspect-video relative overflow-hidden">
-                  <img 
-                    src={item.imageUrl || `https://picsum.photos/seed/${item.id}/600/400`} 
-                    alt={item.title} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute top-2 left-2">
-                    <Badge className="bg-primary text-primary-foreground text-[10px] uppercase font-bold">{item.category}</Badge>
-                  </div>
-                </div>
-                <CardContent className="p-4">
-                  <h3 className="font-bold mb-2 line-clamp-1 group-hover:text-primary transition-colors">{item.title}</h3>
-                  <p className="text-xs text-muted-foreground line-clamp-2 mb-4">{item.content}</p>
-                  <Link to="/news" className="text-[10px] font-black uppercase text-primary flex items-center gap-1">
-                    Read Story <ArrowRight className="h-3 w-3" />
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* Season Progress & Stats */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card className="border-white/10 bg-card/50">
-            <CardHeader>
-              <CardTitle className="text-sm font-bold uppercase tracking-widest italic">Season Progress</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-bold uppercase">
-                  <span>Win Rate</span>
-                  <span className="text-primary">{winRate}%</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${winRate}%` }}
-                    className="h-full bg-primary"
-                  />
-                </div>
+          {/* Support Section - Side Bento */}
+          <div className="md:col-span-12 lg:col-span-6 mt-8">
+            <div className="bg-primary h-full p-8 flex flex-col justify-between relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 opacity-10">
+                <Heart className="h-64 w-64" />
               </div>
-              
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 rounded-xl bg-black/20 border border-white/5">
-                  <p className="text-xs text-muted-foreground font-bold uppercase mb-1">Goals</p>
-                  <p className="text-2xl font-black italic text-primary">{stats.goalsScored}</p>
-                </div>
-                <div className="p-4 rounded-xl bg-black/20 border border-white/5">
-                  <p className="text-xs text-muted-foreground font-bold uppercase mb-1">Conceded</p>
-                  <p className="text-2xl font-black italic">{stats.goalsConceded}</p>
-                </div>
-                <div className="p-4 rounded-xl bg-black/20 border border-white/5">
-                  <p className="text-xs text-muted-foreground font-bold uppercase mb-1">Fans</p>
-                  <p className="text-2xl font-black italic text-primary">{avgAttendance}</p>
-                </div>
-                <div className="p-4 rounded-xl bg-black/20 border border-white/5">
-                  <p className="text-xs text-muted-foreground font-bold uppercase mb-1">Clean Sheets</p>
-                  <p className="text-2xl font-black italic">5</p>
-                </div>
+              <div>
+                <h2 className="text-4xl font-black italic text-primary-foreground uppercase leading-none mb-4">SUPPORT<br />THE STARS</h2>
+                <p className="text-primary-foreground/80 font-medium max-w-sm">
+                  Help us grow the club and support our local talent. Every contribution makes a difference.
+                </p>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Links */}
-          <div className="flex flex-col justify-center gap-4">
-            <h2 className="text-xl font-black italic uppercase tracking-tight">Quick Actions</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Link to="/team">
-                <Button variant="outline" className="w-full justify-between border-white/10 hover:bg-primary hover:text-primary-foreground h-14 font-bold uppercase tracking-widest text-xs">
-                  View Squad <Users className="h-4 w-4" />
-                </Button>
-              </Link>
-              <Link to="/gallery">
-                <Button variant="outline" className="w-full justify-between border-white/10 hover:bg-primary hover:text-primary-foreground h-14 font-bold uppercase tracking-widest text-xs">
-                  Photo Gallery <ImageIcon className="h-4 w-4" />
-                </Button>
-              </Link>
-              <Link to="/donate">
-                <Button variant="outline" className="w-full justify-between border-white/10 hover:bg-primary hover:text-primary-foreground h-14 font-bold uppercase tracking-widest text-xs">
-                  Support Club <Trophy className="h-4 w-4" />
+              <Link to="/donate" className="mt-8">
+                <Button className="bg-black text-white font-black italic px-8 h-14 hover:scale-105 transition-transform">
+                  DONATE NOW
                 </Button>
               </Link>
             </div>
           </div>
+
         </div>
-      </div>
+      </section>
     </div>
   );
 }

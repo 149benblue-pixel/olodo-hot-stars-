@@ -34,10 +34,12 @@ export default function Gallery() {
   }
 
   return (
-    <div className="container py-12 px-4">
-      <div className="text-center mb-12">
-        <h1 className="text-5xl font-black italic mb-4">GALLERY</h1>
-        <p className="text-muted-foreground max-w-2xl mx-auto">
+    <div className="container py-20 px-4">
+      <div className="text-center mb-20">
+        <h1 className="text-[10vw] md:text-[8vw] font-black italic mb-4 leading-none uppercase tracking-tighter">
+          GALL<span className="text-primary">ERY</span>
+        </h1>
+        <p className="text-muted-foreground max-w-2xl mx-auto font-medium">
           Capturing the moments that define our club. From intense training sessions to glorious victories.
         </p>
       </div>
